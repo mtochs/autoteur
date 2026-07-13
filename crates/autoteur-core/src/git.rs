@@ -164,7 +164,7 @@ pub fn summarize_paths(paths: &[String]) -> String {
     match scenes.len() {
         0 => {}
         1 => {
-            let dir = scenes.iter().next().map(|s| *s).unwrap_or_default();
+            let dir = scenes.iter().next().copied().unwrap_or_default();
             let slug = dir.split_once('-').map(|(_, s)| s).unwrap_or(dir);
             phrases.push(format!("scene {slug} changed"));
         }

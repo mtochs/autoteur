@@ -251,7 +251,7 @@ impl Project {
         let beats = load_file(
             &root.join("story").join("beats.toml"),
             &mut issues,
-            |d, t| lint::lint_beats(d, t),
+            lint::lint_beats,
         );
         let takes = load_file(&root.join("takes.manifest.toml"), &mut issues, |d, _t| {
             let mut lints = Vec::new();
@@ -314,10 +314,7 @@ impl Project {
         let mut characters = BTreeMap::new();
         for path in toml_files_in(&root.join("characters"), &mut issues) {
             let (slug, entry) = match slug_of(&path) {
-                Ok(slug) => (
-                    slug,
-                    load_file(&path, &mut issues, |d, t| lint::lint_character(d, t)),
-                ),
+                Ok(slug) => (slug, load_file(&path, &mut issues, lint::lint_character)),
                 Err(message) => {
                     issues.push(FileIssue { path, message });
                     continue;
@@ -330,10 +327,7 @@ impl Project {
         let mut world = BTreeMap::new();
         for path in toml_files_in(&root.join("world"), &mut issues) {
             let (slug, entry) = match slug_of(&path) {
-                Ok(slug) => (
-                    slug,
-                    load_file(&path, &mut issues, |d, t| lint::lint_world(d, t)),
-                ),
+                Ok(slug) => (slug, load_file(&path, &mut issues, lint::lint_world)),
                 Err(message) => {
                     issues.push(FileIssue { path, message });
                     continue;
@@ -570,7 +564,7 @@ pub fn validate(state: &ProjectState) -> Vec<ProjectLint> {
 
     // Timeline references.
     if let Some(timeline) = &state.timeline {
-        let mut check_entry = |shot_ref: &ShotRef, lints: &mut Vec<ProjectLint>| {
+        let check_entry = |shot_ref: &ShotRef, lints: &mut Vec<ProjectLint>| {
             let found = state.scenes.iter().any(|s| {
                 s.slug == shot_ref.scene
                     && s.shots
