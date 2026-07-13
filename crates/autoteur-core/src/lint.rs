@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use toml_edit::{DocumentMut, Item, Table};
+use toml_edit::{DocumentMut, Item, Table, TableLike};
 
 use crate::schema::beats::BeatsFile;
 use crate::schema::character::CharacterFile;
@@ -161,29 +161,49 @@ pub fn lint_shots(doc: &DocumentMut, data: &ShotsFile) -> Vec<Lint> {
 
     check_blocks(doc, "shots", SHOT_KEYS, &["schema_version"], &mut lints);
 
-    // Dialogue cues are inline tables; unknown keys there are typos.
+    // Dialogue cues must be single-line inline tables. Positional arrays
+    // (["mara", "hi"]) field-map silently through serde and swapped fields
+    // produce a wrong cue; sub-table blocks invite the key-after-table
+    // trap. Both get flagged, and unknown cue keys are typos.
     if let Some(aot) = doc.get("shots").and_then(Item::as_array_of_tables) {
         for table in aot.iter() {
             let shot_label = block_label(table, "shot");
-            let cues = table
-                .get("dialogue")
-                .and_then(Item::as_array)
-                .into_iter()
-                .flat_map(|arr| arr.iter());
-            for cue in cues {
-                if let Some(inline) = cue.as_inline_table() {
-                    for (key, _) in inline.iter() {
-                        if !DIALOGUE_KEYS.contains(&key) {
+            match table.get("dialogue") {
+                Some(Item::Value(value)) => {
+                    let cues = value.as_array().into_iter().flat_map(|arr| arr.iter());
+                    for cue in cues {
+                        if let Some(inline) = cue.as_inline_table() {
+                            check_cue_keys(inline, &shot_label, &mut lints);
+                        } else {
                             lints.push(Lint::warning(format!(
-                                "unknown key `{key}` on a dialogue cue of {shot_label}"
+                                "a dialogue cue on {shot_label} is not an inline table — write cues as {{ character = \"...\", line = \"...\" }}, one per line"
                             )));
                         }
                     }
                 }
+                Some(Item::ArrayOfTables(cues)) => {
+                    lints.push(Lint::warning(format!(
+                        "{shot_label} writes dialogue as [[shots.dialogue]] blocks — house style is single-line inline tables (keys added after those blocks land inside the last cue)"
+                    )));
+                    for cue in cues.iter() {
+                        check_cue_keys(cue, &shot_label, &mut lints);
+                    }
+                }
+                _ => {}
             }
         }
     }
     lints
+}
+
+fn check_cue_keys(cue: &dyn TableLike, shot_label: &str, lints: &mut Vec<Lint>) {
+    for (key, _) in cue.iter() {
+        if !DIALOGUE_KEYS.contains(&key) {
+            lints.push(Lint::warning(format!(
+                "unknown key `{key}` on a dialogue cue of {shot_label}"
+            )));
+        }
+    }
 }
 
 pub fn lint_scene(doc: &DocumentMut, _data: &SceneFile) -> Vec<Lint> {
@@ -198,6 +218,7 @@ pub fn lint_character(doc: &DocumentMut, _data: &CharacterFile) -> Vec<Lint> {
     check_subtable(doc, "voice", VOICE_KEYS, CHARACTER_ROOT_KEYS, &mut lints);
     check_subtable(doc, "prompt", PROMPT_KEYS, CHARACTER_ROOT_KEYS, &mut lints);
     check_subtable(doc, "visual", VISUAL_KEYS, CHARACTER_ROOT_KEYS, &mut lints);
+    check_variants(doc, CHARACTER_ROOT_KEYS, &mut lints);
     check_adapters(doc, CHARACTER_ROOT_KEYS, &mut lints);
     lints
 }
@@ -212,6 +233,7 @@ pub fn lint_world(doc: &DocumentMut, data: &WorldFile) -> Vec<Lint> {
     }
     check_subtable(doc, "prompt", PROMPT_KEYS, WORLD_ROOT_KEYS, &mut lints);
     check_subtable(doc, "visual", VISUAL_KEYS, WORLD_ROOT_KEYS, &mut lints);
+    check_variants(doc, WORLD_ROOT_KEYS, &mut lints);
     check_adapters(doc, WORLD_ROOT_KEYS, &mut lints);
     lints
 }
@@ -252,6 +274,8 @@ fn check_blocks(
     }
 }
 
+// `as_table_like` covers standard, dotted, AND inline-table spellings —
+// `voice = { ... }` must get the same checks as `[voice]`.
 fn check_subtable(
     doc: &DocumentMut,
     name: &str,
@@ -259,33 +283,56 @@ fn check_subtable(
     root_keys: &[&str],
     lints: &mut Vec<Lint>,
 ) {
-    if let Some(table) = doc.get(name).and_then(Item::as_table) {
+    if let Some(table) = doc.get(name).and_then(Item::as_table_like) {
         check_table_keys(table, known, root_keys, &format!("[{name}]"), lints);
     }
 }
 
-fn check_adapters(doc: &DocumentMut, root_keys: &[&str], lints: &mut Vec<Lint>) {
-    let Some(aot) = doc
-        .get("visual")
-        .and_then(Item::as_table)
-        .and_then(|v| v.get("adapters"))
-        .and_then(Item::as_array_of_tables)
+/// Root keys appended after `[prompt.variants]` become bogus variants with
+/// no error anywhere else — the variants table accepts freeform names, so
+/// only known-root-key collisions are detectable.
+fn check_variants(doc: &DocumentMut, root_keys: &[&str], lints: &mut Vec<Lint>) {
+    let Some(variants) = doc
+        .get("prompt")
+        .and_then(Item::as_table_like)
+        .and_then(|p| p.get("variants"))
+        .and_then(Item::as_table_like)
     else {
         return;
     };
-    for (i, table) in aot.iter().enumerate() {
-        check_table_keys(
-            table,
-            ADAPTER_KEYS,
-            root_keys,
-            &format!("[[visual.adapters]] entry {}", i + 1),
-            lints,
-        );
+    for (key, _) in variants.iter() {
+        if root_keys.contains(&key) {
+            lints.push(Lint::warning(format!(
+                "top-level key `{key}` found inside [prompt.variants] — it parsed as a variant named {key:?}; move it up under schema_version"
+            )));
+        }
+    }
+}
+
+fn check_adapters(doc: &DocumentMut, root_keys: &[&str], lints: &mut Vec<Lint>) {
+    let Some(adapters) = doc
+        .get("visual")
+        .and_then(Item::as_table_like)
+        .and_then(|v| v.get("adapters"))
+    else {
+        return;
+    };
+    let context = |i: usize| format!("[[visual.adapters]] entry {}", i + 1);
+    if let Some(aot) = adapters.as_array_of_tables() {
+        for (i, table) in aot.iter().enumerate() {
+            check_table_keys(table, ADAPTER_KEYS, root_keys, &context(i), lints);
+        }
+    } else if let Some(array) = adapters.as_array() {
+        for (i, value) in array.iter().enumerate() {
+            if let Some(inline) = value.as_inline_table() {
+                check_table_keys(inline, ADAPTER_KEYS, root_keys, &context(i), lints);
+            }
+        }
     }
 }
 
 fn check_table_keys(
-    table: &Table,
+    table: &dyn TableLike,
     known: &[&str],
     root_keys: &[&str],
     context: &str,

@@ -2,15 +2,19 @@
 //! generation request. Computed live for the compose view, snapshotted
 //! per-take into the manifest, never written back into authored files.
 //!
-//! The load-bearing rule: prompt text and identity assets are separate
-//! channels. Reference images and adapters attach from the effective cast
-//! and world even under a fully literal shot prompt.
+//! Two load-bearing rules:
+//! - Prompt text and identity assets are separate channels. Reference
+//!   images and adapters attach from the effective cast and world even
+//!   under a fully literal shot prompt.
+//! - Substitution reads the template only, in a single pass. Braces inside
+//!   authored prose (action text, fragments, dialogue) are never
+//!   re-interpreted as placeholders.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::id::{CastEntry, Slug};
 use crate::schema::character::CharacterFile;
-use crate::schema::common::Adapter;
+use crate::schema::common::{Adapter, Visual};
 use crate::schema::project::Defaults;
 use crate::schema::scene::SceneFile;
 use crate::schema::shots::Shot;
@@ -18,7 +22,20 @@ use crate::schema::world::{WorldFile, WorldKind};
 
 /// Used when neither the shot nor the project defines a template.
 pub const DEFAULT_PROMPT_TEMPLATE: &str =
-    "{style}\n{framing}. {action}\n{characters}\n{location}\n{world}\n{mood}\n{extra}";
+    "{style}\n{framing}. {action}\n{camera}\n{characters}\n{location}\n{world}\n{mood}\n{extra}";
+
+const KNOWN_SLOTS: [&str; 10] = [
+    "style",
+    "framing",
+    "camera",
+    "action",
+    "characters",
+    "location",
+    "world",
+    "mood",
+    "dialogue",
+    "extra",
+];
 
 pub struct PromptContext<'a> {
     pub defaults: &'a Defaults,
@@ -104,9 +121,14 @@ pub fn resolve(ctx: &PromptContext<'_>, shot: &Shot) -> ResolvedPrompt {
     let mut seen = BTreeSet::new();
     style_slugs.retain(|s| seen.insert(s.clone()));
 
-    let world_fragment = |slug: &Slug, warnings: &mut Vec<String>| -> Option<String> {
+    // A world entry's text = its adapter trigger tokens, then its fragment —
+    // same contract as characters, so world/style LoRAs actually activate.
+    let world_text_of = |slug: &Slug, warnings: &mut Vec<String>| -> Option<String> {
         match ctx.world.get(slug) {
-            Some(entry) => entry.prompt.as_ref().and_then(|p| p.fragment.clone()),
+            Some(entry) => {
+                let fragment = entry.prompt.as_ref().and_then(|p| p.fragment.clone());
+                segments_with_triggers(entry.visual.as_ref(), fragment)
+            }
             None => {
                 warnings.push(format!("unknown world entry `{slug}`"));
                 None
@@ -114,11 +136,11 @@ pub fn resolve(ctx: &PromptContext<'_>, shot: &Shot) -> ResolvedPrompt {
         }
     };
 
-    let style_text = join_fragments(&style_slugs, &world_fragment, &mut warnings);
-    let world_text = join_fragments(&other_world, &world_fragment, &mut warnings);
+    let style_text = join_fragments(&style_slugs, &world_text_of, &mut warnings);
+    let world_text = join_fragments(&other_world, &world_text_of, &mut warnings);
     let location_text = location
         .as_ref()
-        .and_then(|slug| world_fragment(slug, &mut warnings))
+        .and_then(|slug| world_text_of(slug, &mut warnings))
         .unwrap_or_default();
 
     // Character lines: adapter triggers, then the (possibly variant) fragment.
@@ -143,13 +165,8 @@ pub fn resolve(ctx: &PromptContext<'_>, shot: &Shot) -> ResolvedPrompt {
             },
             None => base,
         };
-        let mut segments: Vec<String> = Vec::new();
-        if let Some(visual) = &character.visual {
-            segments.extend(visual.adapters.iter().filter_map(|a| a.trigger.clone()));
-        }
-        segments.extend(text);
-        if !segments.is_empty() {
-            character_lines.push(segments.join(", "));
+        if let Some(line) = segments_with_triggers(character.visual.as_ref(), text) {
+            character_lines.push(line);
         }
     }
     let characters_text = character_lines.join("\n");
@@ -183,23 +200,31 @@ pub fn resolve(ctx: &PromptContext<'_>, shot: &Shot) -> ResolvedPrompt {
         .or_else(|| ctx.defaults.prompt_template.clone())
         .unwrap_or_else(|| DEFAULT_PROMPT_TEMPLATE.to_owned());
 
-    let substituted = template
-        .replace("{style}", &style_text)
-        .replace("{framing}", &framing_text)
-        .replace("{camera}", shot.camera.as_deref().unwrap_or("").trim())
-        .replace("{action}", shot.action.as_deref().unwrap_or("").trim())
-        .replace("{characters}", &characters_text)
-        .replace("{location}", &location_text)
-        .replace("{world}", &world_text)
-        .replace("{mood}", ctx.scene.mood.as_deref().unwrap_or(""))
-        .replace("{dialogue}", &dialogue_text)
-        .replace("{extra}", shot.prompt_extra.as_deref().unwrap_or(""));
+    let mut values: BTreeMap<&str, String> = BTreeMap::new();
+    values.insert("style", style_text);
+    values.insert("framing", framing_text);
+    values.insert(
+        "camera",
+        shot.camera.as_deref().unwrap_or("").trim().to_owned(),
+    );
+    values.insert(
+        "action",
+        shot.action.as_deref().unwrap_or("").trim().to_owned(),
+    );
+    values.insert("characters", characters_text);
+    values.insert("location", location_text);
+    values.insert("world", world_text);
+    values.insert(
+        "mood",
+        ctx.scene.mood.as_deref().unwrap_or("").trim().to_owned(),
+    );
+    values.insert("dialogue", dialogue_text);
+    values.insert(
+        "extra",
+        shot.prompt_extra.as_deref().unwrap_or("").trim().to_owned(),
+    );
 
-    for placeholder in find_placeholders(&substituted) {
-        warnings.push(format!(
-            "unresolved placeholder `{{{placeholder}}}` left in prompt"
-        ));
-    }
+    let prompt = render_template(&template, &values, &mut warnings);
 
     // Negative: project default, then style/location/world, cast, shot extra.
     let mut negative_parts: Vec<String> = Vec::new();
@@ -252,12 +277,22 @@ pub fn resolve(ctx: &PromptContext<'_>, shot: &Shot) -> ResolvedPrompt {
     warnings.dedup();
 
     ResolvedPrompt {
-        prompt: tidy(&substituted),
+        prompt,
         negative,
         reference_images,
         adapters,
         warnings,
     }
+}
+
+/// Adapter trigger tokens, then the fragment text, comma-joined.
+fn segments_with_triggers(visual: Option<&Visual>, fragment: Option<String>) -> Option<String> {
+    let mut segments: Vec<String> = Vec::new();
+    if let Some(visual) = visual {
+        segments.extend(visual.adapters.iter().filter_map(|a| a.trigger.clone()));
+    }
+    segments.extend(fragment);
+    (!segments.is_empty()).then(|| segments.join(", "))
 }
 
 fn join_fragments(
@@ -274,7 +309,7 @@ fn join_fragments(
 
 fn collect_visual(
     owner: &Slug,
-    visual: &crate::schema::common::Visual,
+    visual: &Visual,
     reference_images: &mut Vec<OwnedRef>,
     adapters: &mut Vec<OwnedAdapter>,
 ) {
@@ -288,55 +323,134 @@ fn collect_visual(
     }));
 }
 
-/// Collapse the artifacts of empty placeholder slots: runs of spaces, lines
-/// reduced to orphaned leading punctuation, and stacked blank lines.
-fn tidy(text: &str) -> String {
-    let mut out: Vec<String> = Vec::new();
-    for raw in text.lines() {
-        let mut line = raw.trim().to_owned();
-        while line.contains("  ") {
-            line = line.replace("  ", " ");
-        }
-        let stripped = line.trim_start_matches(|c: char| ",.;: ".contains(c));
-        let line = if stripped.len() != line.len() {
-            stripped.to_owned()
-        } else {
-            line
+enum Part<'t> {
+    Literal(&'t str),
+    Slot(&'t str),
+}
+
+/// Split one template line into literal runs and recognized slots. Unknown
+/// `{token}`s stay literal; their names are reported so typos like
+/// `{actoin}` surface (but only for templates that use slots at all —
+/// braces in a fully literal prompt are prose).
+fn tokenize_line<'t>(line: &'t str, unknown: &mut Vec<String>) -> Vec<Part<'t>> {
+    let mut parts = Vec::new();
+    let mut rest = line;
+    while let Some(open) = rest.find('{') {
+        let Some(close_rel) = rest[open + 1..].find('}') else {
+            break;
         };
-        if line.is_empty() {
-            if out.last().is_some_and(|l| !l.is_empty()) {
+        let name = &rest[open + 1..open + 1 + close_rel];
+        let token_like = (1..=30).contains(&name.len())
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+        let lit_end = open + 1 + close_rel + 1;
+        if token_like && KNOWN_SLOTS.contains(&name) {
+            if open > 0 {
+                parts.push(Part::Literal(&rest[..open]));
+            }
+            parts.push(Part::Slot(name));
+        } else {
+            if token_like {
+                unknown.push(name.to_owned());
+            }
+            parts.push(Part::Literal(&rest[..lit_end]));
+        }
+        rest = &rest[lit_end..];
+    }
+    if !rest.is_empty() {
+        parts.push(Part::Literal(rest));
+    }
+    parts
+}
+
+/// Single-pass render. Slot values are spliced verbatim and never
+/// re-scanned. Separator literals directly after an empty slot are
+/// absorbed; lines whose slots all resolve empty are dropped; a template
+/// with no recognized slots is a literal prompt and passes through intact.
+fn render_template(
+    template: &str,
+    values: &BTreeMap<&str, String>,
+    warnings: &mut Vec<String>,
+) -> String {
+    let mut unknown_tokens = Vec::new();
+    let mut rendered: Vec<(String, bool, bool)> = Vec::new(); // (text, had_slot, all_slots_empty)
+    let mut any_slot = false;
+
+    for line in template.lines() {
+        let parts = tokenize_line(line, &mut unknown_tokens);
+        let mut assembled = String::new();
+        let mut had_slot = false;
+        let mut all_empty = true;
+        let mut prev_slot_empty = false;
+        let mut leading_empty_slot = false;
+        let mut first = true;
+        for part in &parts {
+            match part {
+                Part::Literal(lit) => {
+                    if !(prev_slot_empty && is_separator_only(lit)) {
+                        assembled.push_str(lit);
+                        prev_slot_empty = false;
+                    }
+                }
+                Part::Slot(name) => {
+                    had_slot = true;
+                    any_slot = true;
+                    let value = values.get(*name).map(String::as_str).unwrap_or("");
+                    if value.is_empty() {
+                        prev_slot_empty = true;
+                        if first {
+                            leading_empty_slot = true;
+                        }
+                    } else {
+                        all_empty = false;
+                        prev_slot_empty = false;
+                        assembled.push_str(value);
+                    }
+                }
+            }
+            first = false;
+        }
+        if leading_empty_slot {
+            assembled = assembled.trim_start().to_owned();
+        }
+        rendered.push((assembled, had_slot, all_empty));
+    }
+
+    if !any_slot {
+        // Literal prompt: no cleanup, no placeholder warnings on prose braces.
+        return template.trim().to_owned();
+    }
+    for token in unknown_tokens {
+        warnings.push(format!(
+            "unknown placeholder `{{{token}}}` in prompt template"
+        ));
+    }
+
+    let mut out: Vec<String> = Vec::new();
+    for (assembled, had_slot, all_empty) in rendered {
+        if had_slot && all_empty {
+            continue; // nothing resolved on this line, drop it (labels too)
+        }
+        let text = if had_slot {
+            assembled.trim_end().to_owned()
+        } else {
+            assembled
+        };
+        if text.trim().is_empty() {
+            if out.last().is_some_and(|l| !l.trim().is_empty()) {
                 out.push(String::new());
             }
-        } else {
-            out.push(line);
+            continue;
         }
+        out.push(text);
     }
-    while out.last().is_some_and(String::is_empty) {
+    while out.last().is_some_and(|l| l.trim().is_empty()) {
         out.pop();
     }
     out.join("\n")
 }
 
-fn find_placeholders(text: &str) -> Vec<String> {
-    let mut found = Vec::new();
-    let bytes = text.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'{' {
-            if let Some(end) = text[i + 1..].find('}') {
-                let inner = &text[i + 1..i + 1 + end];
-                if (1..=30).contains(&inner.len())
-                    && inner
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-                {
-                    found.push(inner.to_owned());
-                }
-                i += end + 2;
-                continue;
-            }
-        }
-        i += 1;
-    }
-    found
+fn is_separator_only(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| ",.;:| -".contains(c))
 }

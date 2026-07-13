@@ -52,15 +52,14 @@ pub struct ShotId(String);
 impl ShotId {
     pub fn new(value: impl Into<String>) -> Result<Self, Error> {
         let value = value.into();
-        let valid =
-            !value.is_empty() && value.len() <= 4 && value.chars().all(|c| c.is_ascii_lowercase());
+        let valid = !value.is_empty() && value.chars().all(|c| c.is_ascii_lowercase());
         if valid {
             Ok(Self(value))
         } else {
             Err(Error::InvalidId {
                 kind: "shot id",
                 value,
-                expected: "1-4 lowercase letters (a, b, ... z, aa, ab, ...)",
+                expected: "one or more lowercase letters (a, b, ... z, aa, ab, ...)",
             })
         }
     }
@@ -70,13 +69,16 @@ impl ShotId {
     }
 
     /// Position in the bijective base-26 sequence: a=1, z=26, aa=27, ...
-    pub fn index(&self) -> u32 {
-        self.0
-            .bytes()
-            .fold(0u32, |acc, b| acc * 26 + u32::from(b - b'a') + 1)
+    /// Saturates on absurdly long ids so `next_after` can never mint an id
+    /// its own validator rejects.
+    pub fn index(&self) -> u128 {
+        self.0.bytes().fold(0u128, |acc, b| {
+            acc.saturating_mul(26)
+                .saturating_add(u128::from(b - b'a') + 1)
+        })
     }
 
-    fn from_index(mut n: u32) -> Self {
+    fn from_index(mut n: u128) -> Self {
         let mut buf = Vec::new();
         while n > 0 {
             n -= 1;
@@ -91,8 +93,8 @@ impl ShotId {
     /// pass ids from `shots.toml` AND from the takes manifest for the scene,
     /// so a deleted shot's letter is never reused.
     pub fn next_after<'a>(existing: impl IntoIterator<Item = &'a ShotId>) -> Self {
-        let max = existing.into_iter().map(ShotId::index).max().unwrap_or(0);
-        Self::from_index(max + 1)
+        let max = existing.into_iter().map(|id| id.index()).max().unwrap_or(0);
+        Self::from_index(max.saturating_add(1))
     }
 }
 
@@ -104,7 +106,8 @@ impl PartialOrd for ShotId {
 
 impl Ord for ShotId {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.index().cmp(&other.index())
+        // Bijective base-26 order without arithmetic: shorter first, then lex.
+        (self.0.len(), &self.0).cmp(&(other.0.len(), &other.0))
     }
 }
 
@@ -324,8 +327,23 @@ mod tests {
 
     #[test]
     fn shot_id_rejects_bad_forms() {
-        for bad in ["", "A", "1", "abcde", "a-b"] {
+        for bad in ["", "A", "1", "a-b", "a b"] {
             assert!(ShotId::new(bad).is_err(), "{bad} should be invalid");
+        }
+    }
+
+    #[test]
+    fn next_after_always_mints_a_valid_id() {
+        // The successor of any valid id must itself validate — including at
+        // former length boundaries and at saturation.
+        for start in ["zzzz", "zzzzzzzzzzzz", "z"] {
+            let id = ShotId::new(start).expect("valid");
+            let next = ShotId::next_after([&id]);
+            assert!(
+                ShotId::new(next.as_str()).is_ok(),
+                "next_after({start}) minted invalid id {next}"
+            );
+            assert!(next > id, "successor must sort after {start}");
         }
     }
 

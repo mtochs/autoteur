@@ -351,10 +351,121 @@ fn missing_variant_falls_back_with_warning() {
 }
 
 #[test]
-fn unresolved_placeholders_warn() {
+fn unresolved_placeholders_warn_in_templates() {
     let f = Fixture::new();
     let mut s = shot("a");
-    s.prompt = Some("something {wat} here".to_owned());
+    s.action = Some("The door opens.".to_owned());
+    s.prompt = Some("{action} something {wat} here".to_owned());
     let resolved = resolve(&f.ctx(), &s);
     assert!(resolved.warnings.iter().any(|w| w.contains("{wat}")));
+    // The unknown token stays literal — never silently dropped.
+    assert!(resolved.prompt.contains("{wat}"));
+}
+
+#[test]
+fn literal_prompt_braces_are_prose_not_placeholders() {
+    let f = Fixture::new();
+    let mut s = shot("a");
+    s.prompt = Some("he gestures {wildly} at the door".to_owned());
+    let resolved = resolve(&f.ctx(), &s);
+    assert_eq!(resolved.prompt, "he gestures {wildly} at the door");
+    assert!(
+        resolved.warnings.is_empty(),
+        "prose braces in a literal prompt must not warn: {:?}",
+        resolved.warnings
+    );
+}
+
+#[test]
+fn braces_in_substituted_values_are_never_reinterpreted() {
+    let f = Fixture::new();
+    let mut s = shot("a");
+    s.action = Some("a sign reads {mood} in neon".to_owned());
+    s.prompt = Some("{action}".to_owned());
+    let resolved = resolve(&f.ctx(), &s);
+    // The braces came from the action VALUE, not the template: they stay
+    // literal, the scene mood is not spliced into them, and nothing warns.
+    assert_eq!(resolved.prompt, "a sign reads {mood} in neon");
+    assert!(
+        resolved.warnings.is_empty(),
+        "value braces must not warn: {:?}",
+        resolved.warnings
+    );
+}
+
+#[test]
+fn authored_leading_punctuation_survives() {
+    let f = Fixture::new();
+    let mut s = shot("a");
+    s.characters = Some(vec![]);
+    s.world = Some(vec![]);
+    s.action = Some("...and the door gives way.".to_owned());
+    let resolved = resolve(&f.ctx(), &s);
+    assert!(
+        resolved.prompt.contains("...and the door gives way."),
+        "authored ellipsis was eaten: {:?}",
+        resolved.prompt
+    );
+}
+
+#[test]
+fn camera_reaches_the_default_template() {
+    let f = Fixture::new();
+    let mut s = shot("a");
+    s.action = Some("The room is empty.".to_owned());
+    s.camera = Some("slow push-in from the blast door".to_owned());
+    let resolved = resolve(&f.ctx(), &s);
+    assert!(
+        resolved.prompt.contains("slow push-in from the blast door"),
+        "authored camera move must not vanish: {:?}",
+        resolved.prompt
+    );
+}
+
+#[test]
+fn world_adapter_triggers_reach_the_prompt() {
+    let mut f = Fixture::new();
+    if let Some(style) = f.world.get_mut(&slug("neon-noir-style")) {
+        style.visual = Some(Visual {
+            reference_images: vec![],
+            adapters: vec![Adapter {
+                kind: AdapterKind::Lora,
+                source: "civitai:999".to_owned(),
+                weight: Some(0.7),
+                trigger: Some("n3onnoir".to_owned()),
+                token: None,
+            }],
+        });
+    }
+    let mut s = shot("a");
+    s.action = Some("A rain-soaked street.".to_owned());
+    let resolved = resolve(&f.ctx(), &s);
+    assert!(
+        resolved.prompt.contains("n3onnoir, neo-noir"),
+        "style LoRA trigger must prepend to its fragment: {:?}",
+        resolved.prompt
+    );
+    assert!(resolved
+        .adapters
+        .iter()
+        .any(|a| a.adapter.source == "civitai:999"));
+}
+
+#[test]
+fn label_lines_with_only_empty_slots_drop() {
+    let f = Fixture::new();
+    let mut s = shot("a");
+    s.action = Some("The vault door.".to_owned());
+    s.prompt = Some("{action}\nMood: {mood}\nExtra: {extra}".to_owned());
+    // Empty the mood so its labelled line must disappear entirely.
+    let mut scene = f.scene.clone();
+    scene.mood = None;
+    let ctx = PromptContext {
+        defaults: &f.defaults,
+        scene: &scene,
+        characters: &f.characters,
+        world: &f.world,
+    };
+    let resolved = resolve(&ctx, &s);
+    assert_eq!(resolved.prompt, "The vault door.");
 }

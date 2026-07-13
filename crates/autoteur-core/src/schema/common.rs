@@ -98,19 +98,38 @@ impl From<AdapterKind> for String {
 }
 
 /// TOML distinguishes `6` from `6.0`; agents write both. Accept either for
-/// any float-valued field.
+/// any float-valued field, reject everything else with a message fit for
+/// the "fix it for me" banner, and refuse nan/inf (they poison duration
+/// math downstream).
 pub(crate) fn de_lenient_opt_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Num {
-        Int(i64),
-        Float(f64),
+    struct NumVisitor;
+
+    impl serde::de::Visitor<'_> for NumVisitor {
+        type Value = f64;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a number (e.g. 6 or 6.0)")
+        }
+
+        fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<f64, E> {
+            Ok(v as f64)
+        }
+
+        fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<f64, E> {
+            Ok(v as f64)
+        }
+
+        fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<f64, E> {
+            if v.is_finite() {
+                Ok(v)
+            } else {
+                Err(E::custom("expected a finite number (not nan or inf)"))
+            }
+        }
     }
-    Ok(Option::<Num>::deserialize(deserializer)?.map(|n| match n {
-        Num::Int(i) => i as f64,
-        Num::Float(f) => f,
-    }))
+
+    deserializer.deserialize_any(NumVisitor).map(Some)
 }

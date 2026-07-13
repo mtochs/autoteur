@@ -212,6 +212,81 @@ fn drag_reorder_moves_whole_blocks_and_keeps_their_comments() {
 }
 
 #[test]
+fn reorder_still_works_after_a_programmatic_append() {
+    use autoteur_core::toml_edit::{value, Item, Table};
+
+    let (_, mut document) = doc::parse::<BeatsFile>(BEATS).expect("parse");
+    let mut fresh = Table::new();
+    fresh.insert("id", value("brand-new"));
+    fresh.insert("title", value("Brand new beat"));
+    document
+        .get_mut("beats")
+        .and_then(Item::as_array_of_tables_mut)
+        .expect("beats array")
+        .push(fresh);
+
+    // The appended table has no document position yet; the move must not
+    // silently keep the old serialized order.
+    doc::move_block(&mut document, "beats", 0, 1).expect("move");
+    let (reparsed, _) = doc::parse::<BeatsFile>(&document.to_string()).expect("reparse");
+    let ids: Vec<_> = reparsed.beats.iter().map(|b| b.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [
+            "midpoint-betrayal",
+            "cold-open-heist",
+            "e02-fallout",
+            "brand-new"
+        ]
+    );
+}
+
+#[test]
+fn uncircle_removes_exactly_one_line_and_keeps_comments() {
+    let (_, mut document) = doc::parse::<ShotsFile>(SHOTS).expect("parse");
+    let removed =
+        doc::remove_block_field(&mut document, "shots", 0, "selected_take").expect("remove");
+    assert!(removed);
+    let edited = document.to_string();
+
+    let before_lines = SHOTS.lines().count();
+    let after_lines = edited.lines().count();
+    assert_eq!(
+        before_lines - after_lines,
+        1,
+        "un-circling must delete exactly the selected_take line"
+    );
+    // The comment block that documented `status` (parsed as the removed
+    // key's prefix decor) must survive the removal.
+    assert!(edited.contains("# Director/agent INTENT only. Take counts,"));
+    assert!(edited.contains("# queue and are never written into this file."));
+    let (reparsed, _) = doc::parse::<ShotsFile>(&edited).expect("reparse");
+    assert!(reparsed.shots[0].selected_take.is_none());
+}
+
+#[test]
+fn crlf_files_keep_their_line_endings_on_edit() {
+    let crlf_source = SHOTS.replace('\n', "\r\n");
+    let crlf = doc::detect_crlf(&crlf_source);
+    assert!(crlf);
+    let (_, mut document) = doc::parse::<ShotsFile>(&crlf_source).expect("parse CRLF");
+    doc::set_block_field(&mut document, "shots", 1, "status", Value::from("locked")).expect("edit");
+    let edited = doc::serialize(&document, crlf);
+
+    // Every newline stays CRLF — no mixed-EOL churn.
+    assert_eq!(
+        edited.matches('\n').count(),
+        edited.matches("\r\n").count(),
+        "edit introduced bare-LF lines into a CRLF file"
+    );
+    let before: Vec<&str> = crlf_source.split("\r\n").collect();
+    let after: Vec<&str> = edited.split("\r\n").collect();
+    assert_eq!(before.len(), after.len());
+    let changed = (0..before.len()).filter(|&i| before[i] != after[i]).count();
+    assert_eq!(changed, 1, "exactly one line changes on a CRLF file too");
+}
+
+#[test]
 fn malformed_toml_is_a_syntax_error() {
     assert!(doc::parse::<ShotsFile>("[[shots]\nid = \"a\"").is_err());
 }
@@ -221,6 +296,19 @@ fn wrong_types_are_schema_errors_not_panics() {
     assert!(doc::parse::<SceneFile>("title = 3").is_err());
     assert!(doc::parse::<ShotsFile>("[[shots]]\nid = \"NOT-VALID\"").is_err());
     assert!(doc::parse::<ShotsFile>("[[shots]]\nid = \"a\"\nselected_take = \"\"").is_err());
+    // Non-finite durations are rejected, and the wrong-type message is
+    // human-readable for the fix-it banner.
+    assert!(doc::parse::<ShotsFile>("[[shots]]\nid = \"a\"\nduration_s = nan").is_err());
+    let err = doc::parse::<ShotsFile>("[[shots]]\nid = \"a\"\nduration_s = true")
+        .expect_err("bool duration");
+    let chain = format!(
+        "{err}: {:?}",
+        std::error::Error::source(&err).map(|s| s.to_string())
+    );
+    assert!(
+        chain.contains("a number"),
+        "error should say what was expected, got: {chain}"
+    );
 }
 
 #[test]

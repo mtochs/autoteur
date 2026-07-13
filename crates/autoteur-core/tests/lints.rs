@@ -69,6 +69,63 @@ fn unknown_status_and_unknown_dialogue_key_warn() {
 }
 
 #[test]
+fn inline_subtables_get_the_same_key_checks() {
+    let text = "schema_version = 1\nname = \"Mara\"\nvoice = { provider = \"elevenlabs\", voise_id = \"abc\" }\n";
+    let (data, document) = doc::parse::<CharacterFile>(text).expect("parses");
+    let lints = lint::lint_character(&document, &data);
+    assert!(
+        lints.iter().any(|l| l.message.contains("voise_id")),
+        "inline-table voice must get unknown-key checks: {lints:?}"
+    );
+}
+
+#[test]
+fn variants_table_swallowing_a_root_key_is_flagged() {
+    let text = "schema_version = 1\nname = \"Mara\"\n\n[prompt]\nfragment = \"Mara\"\n\n[prompt.variants]\nstorm = \"Mara in rain gear\"\ndescription = \"this was meant to be top-level\"\n";
+    let (data, document) = doc::parse::<CharacterFile>(text).expect("parses");
+    let lints = lint::lint_character(&document, &data);
+    let hit = lints
+        .iter()
+        .find(|l| l.message.contains("[prompt.variants]"))
+        .expect("variants swallow flagged");
+    assert!(hit.message.contains("description"), "{}", hit.message);
+}
+
+#[test]
+fn non_inline_table_dialogue_cues_are_flagged() {
+    // Positional arrays field-map through serde with swapped-field hazards.
+    let text = "[[shots]]\nid = \"a\"\ndialogue = [[\"run\", \"june-park\"]]\n";
+    let (data, document) = doc::parse::<ShotsFile>(text).expect("parses");
+    let lints = lint::lint_shots(&document, &data);
+    assert!(
+        lints
+            .iter()
+            .any(|l| l.message.contains("not an inline table")),
+        "positional cue must be flagged: {lints:?}"
+    );
+}
+
+#[test]
+fn sub_table_dialogue_blocks_are_flagged_and_still_key_checked() {
+    let text = "[[shots]]\nid = \"a\"\n\n[[shots.dialogue]]\ncharacter = \"mara-chen\"\nline = \"hi\"\ndeliverey = \"typo\"\n";
+    let (data, document) = doc::parse::<ShotsFile>(text).expect("parses");
+    assert_eq!(data.shots[0].dialogue.len(), 1);
+    let lints = lint::lint_shots(&document, &data);
+    assert!(
+        lints
+            .iter()
+            .any(|l| l.message.contains("[[shots.dialogue]]")),
+        "house-style violation must be flagged: {lints:?}"
+    );
+    assert!(
+        lints
+            .iter()
+            .any(|l| l.message.contains("unknown key `deliverey`")),
+        "typo keys inside sub-table cues must be flagged: {lints:?}"
+    );
+}
+
+#[test]
 fn missing_schema_version_warns() {
     let (data, document) = doc::parse::<SceneFile>("title = \"x\"").expect("parses");
     let lints = lint::lint_scene(&document, &data);
