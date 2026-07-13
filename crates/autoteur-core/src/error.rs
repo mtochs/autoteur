@@ -40,6 +40,12 @@ pub enum Error {
     Watch(String),
 
     #[error("{0}")]
+    Generation(String),
+
+    #[error("credential store error: {0}")]
+    Secret(String),
+
+    #[error("{0}")]
     Project(String),
 }
 

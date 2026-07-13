@@ -73,7 +73,7 @@ pub fn move_block(doc: &mut DocumentMut, key: &str, from: usize, to: usize) -> R
     Ok(())
 }
 
-fn max_table_position(doc: &DocumentMut) -> isize {
+pub(crate) fn max_table_position(doc: &DocumentMut) -> isize {
     fn walk(item: &Item, max: &mut isize) {
         match item {
             Item::Table(table) => {

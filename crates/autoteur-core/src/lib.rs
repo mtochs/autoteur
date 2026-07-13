@@ -15,8 +15,11 @@ pub mod id;
 pub mod lint;
 pub mod project;
 pub mod prompt;
+pub mod provider;
+pub mod queue;
 pub mod schema;
 pub mod sync;
+pub mod takes_store;
 
 pub use error::{Error, Result};
 // Re-exported so downstream crates edit documents with the same version.
