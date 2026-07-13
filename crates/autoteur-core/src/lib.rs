@@ -7,6 +7,7 @@
 
 #![cfg_attr(not(test), warn(clippy::unwrap_used))]
 
+pub mod atomic;
 pub mod doc;
 pub mod error;
 pub mod git;
@@ -15,6 +16,7 @@ pub mod lint;
 pub mod project;
 pub mod prompt;
 pub mod schema;
+pub mod sync;
 
 pub use error::{Error, Result};
 // Re-exported so downstream crates edit documents with the same version.

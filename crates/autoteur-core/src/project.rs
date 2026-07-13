@@ -40,14 +40,14 @@ pub struct Project {
     root: PathBuf,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileEntry<T> {
     pub path: PathBuf,
     pub data: T,
     pub lints: Vec<Lint>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SceneEntry {
     pub number: u32,
     pub slug: Slug,
@@ -56,7 +56,7 @@ pub struct SceneEntry {
     pub shots: Option<FileEntry<ShotsFile>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ProjectState {
     pub manifest: Option<FileEntry<ProjectFile>>,
     pub beats: Option<FileEntry<BeatsFile>>,
@@ -625,6 +625,11 @@ pub fn read_text(path: &Path) -> Result<String> {
         path: path.to_owned(),
         source: e,
     })?;
+    text_from_bytes(path, &bytes)
+}
+
+/// Decode already-read bytes with the same encoding rules as [`read_text`].
+pub fn text_from_bytes(path: &Path, bytes: &[u8]) -> Result<String> {
     let looks_utf16 = bytes.starts_with(&[0xFF, 0xFE])
         || bytes.starts_with(&[0xFE, 0xFF])
         || bytes.iter().take(64).any(|b| *b == 0);
@@ -635,14 +640,11 @@ pub fn read_text(path: &Path) -> Result<String> {
                 .to_owned(),
         });
     }
-    let text = String::from_utf8(bytes).map_err(|_| Error::Encoding {
+    let text = std::str::from_utf8(bytes).map_err(|_| Error::Encoding {
         path: path.to_owned(),
         hint: String::new(),
     })?;
-    Ok(match text.strip_prefix('\u{feff}') {
-        Some(stripped) => stripped.to_owned(),
-        None => text,
-    })
+    Ok(text.strip_prefix('\u{feff}').unwrap_or(text).to_owned())
 }
 
 /// Turn a title into a valid identity slug ("The Vault Job!" → "the-vault-job").

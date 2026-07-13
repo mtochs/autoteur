@@ -36,6 +36,9 @@ pub enum Error {
     #[error("git operation failed")]
     Git(#[source] Box<git2::Error>),
 
+    #[error("file watcher failed: {0}")]
+    Watch(String),
+
     #[error("{0}")]
     Project(String),
 }

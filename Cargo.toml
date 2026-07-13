@@ -17,3 +17,4 @@ thiserror = "2"
 anyhow = "1"
 blake3 = "1"
 git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+notify = "8"
