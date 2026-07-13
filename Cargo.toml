@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/autoteur-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.85"
+repository = "https://github.com/autoteur/autoteur"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+toml_edit = { version = "0.23", features = ["serde"] }
+thiserror = "2"
+anyhow = "1"
+blake3 = "1"

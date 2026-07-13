@@ -1,0 +1,10 @@
+# autoteur.toml - project manifest.
+schema_version = 1
+
+title = "Cold Signal"
+format = "series"          # "feature" | "series" (UI hint, not a schema switch)
+
+[defaults]
+prompt_template = "{style}\n{framing}. {action}\n{characters}\n{location}\n{world}\n{mood}\n{extra}"
+negative = "watermark, text overlay, low quality"
+style = ["neon-noir-style"]

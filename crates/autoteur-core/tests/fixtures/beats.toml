@@ -1,0 +1,51 @@
+# story/beats.toml - one [[beats]] block per index card on the Beat Board.
+# Card order = block order in this file. Reorder by moving whole blocks.
+# Series: the board groups cards by episode; append a new beat after the
+# last beat of the SAME episode. Root keys (schema_version) must appear
+# above the first [[...]] block - never at the end of the file.
+schema_version = 1
+
+# Series only - a feature film omits [[episodes]] and every `episode` key
+# below; nothing else changes (feature -> series is purely additive).
+# Episode order = block order. `color` tints that episode's cards.
+[[episodes]]
+id = "e01"                 # frozen at creation
+title = "Cold Signal"
+color = "sky"              # rose|amber|lime|teal|sky|violet|slate|sand
+
+[[episodes]]
+id = "e02"
+title = "The Auditor"
+color = "violet"
+
+[[beats]]
+id = "cold-open-heist"     # kebab-case, unique in this file, FROZEN at
+                           # creation - scenes reference beats by id
+title = "Cold open: the vault job goes sideways"
+episode = "e01"            # series only; omit in a feature
+act = 1                    # optional integer, scoped to the episode/film
+summary = '''
+Mara's crew breaches the Halcyon vault and finds it already empty -
+except for a device that has just started counting down.
+'''
+
+[[beats]]
+id = "midpoint-betrayal"
+title = "June sold the route"
+episode = "e01"
+act = 2
+color = "amber"            # optional manual tint; delete the line to revert
+                           # to episode color (series) / act palette (feature)
+summary = '''
+Mara finds the buyer's mark in June's ledger. The rescue was a lure.
+'''
+notes = "Tone pivot: the comedy drains out over three scenes."
+
+[[beats]]
+id = "e02-fallout"
+title = "Fallout in the safehouse"
+episode = "e02"
+act = 1
+summary = '''
+Nobody says the word "betrayal". Everyone thinks it.
+'''

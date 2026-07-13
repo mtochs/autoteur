@@ -1,0 +1,18 @@
+[package]
+name = "autoteur-core"
+description = "Domain types, file formats, prompt resolution, and validation for Autoteur projects"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+toml = { workspace = true }
+toml_edit = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "warn"

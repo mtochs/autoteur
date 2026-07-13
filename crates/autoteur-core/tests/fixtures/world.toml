@@ -1,0 +1,19 @@
+# world/halcyon-vault.toml - the filename stem IS this entry's id.
+schema_version = 1
+
+name = "The Halcyon Vault"
+kind = "location"          # location | prop | vehicle | style
+
+description = '''
+Corporate cold-storage vault, sublevel 9. Brushed-steel racks, a single
+circular blast door, no natural light. Reads as a bank crossed with a morgue.
+'''
+
+[prompt]
+fragment = "the Halcyon vault antechamber, brushed-steel racks receding into darkness, circular blast door, single amber worklight, wet concrete floor"
+negative = "daylight, windows, warm colors"
+
+[visual]
+reference_images = [
+  "world/refs/halcyon-vault/wide.png",
+]

@@ -1,0 +1,75 @@
+# scenes/012-vault-breach/shots.toml
+# Shot order = block order; reorder by moving whole [[shots]] blocks.
+# Shot ids are per-scene letters ("a", "b", ... then "aa"), FROZEN at
+# creation and never reused - when adding a shot, take the next letter
+# after the highest ever used (check takes.manifest.toml too). Delete
+# nothing that has takes; set status = "omitted" instead.
+# Global reference form: "vault-breach/c" (scene slug + shot id).
+# Keep every key of a shot inside its own [[shots]] block, and keep each
+# dialogue cue on a single line.
+schema_version = 1
+
+[[shots]]
+id = "a"
+framing = "wide"           # wide | medium | close-up | extreme-close-up |
+                           # two-shot | ots | pov | insert | aerial
+                           # (free text; the UI autocompletes these and the
+                           # prompt resolver expands them to full phrases)
+camera = "slow push-in from the breached blast door"     # optional move
+action = '''
+The antechamber lies bare under strip-light. Empty racks recede into
+darkness. Center floor: the drill rig throws the only warm light.
+'''
+duration_s = 6.0           # target seconds; actual trim lives in timeline.toml
+status = "locked"          # planned | ready | locked | omitted
+                           # Director/agent INTENT only. Take counts,
+                           # generating/queued, and "circled" badges are
+                           # derived from takes.manifest.toml + the job
+                           # queue and are never written into this file.
+selected_take = "tk_3f9c2a8b41de"    # the circled take (id from
+                           # takes.manifest.toml). OMIT the line when
+                           # nothing is circled - never write "" or "none".
+# `characters` omitted -> this shot inherits the scene cast.
+
+[[shots]]
+id = "b"
+framing = "two-shot"
+action = "Mara sweeps the racks with a hand lamp while June hangs back in the doorway."
+characters = ["mara-chen", "june-park"]   # explicit = EXACTLY these are in
+                           # frame (drives image/LoRA/fragment injection);
+                           # [] = nobody in frame
+duration_s = 9.5
+status = "ready"
+# Dialogue: ordered cues, one single-line inline table per cue. `character`
+# is a characters/ slug (off-screen and V.O. speakers are legal - they get
+# voice injection but visual injection follows `characters` above).
+# `delivery` is the optional parenthetical.
+dialogue = [
+  { character = "mara-chen", line = "That's forty seconds early." },
+  { character = "june-park", line = "Sensor ghost. It happens.", delivery = "too calm" },
+  { character = "mara-chen", line = "Not in this building." },
+]
+notes = "The beat lives in June's stillness - if takes read panicked, regenerate."
+
+[[shots]]
+id = "c"
+framing = "insert"
+action = "The drill bit, forgotten, still spinning down against the floor plate."
+characters = []            # nobody in frame - no character injection
+world = ["crew-drill-rig"] # override: replaces the scene's location+world
+                           # for this shot (omit to inherit both)
+duration_s = 2.0
+status = "ready"
+# Optional custom template - replaces the project default template from
+# autoteur.toml. Placeholders keep injection alive; a fully literal prompt
+# is just a template with zero placeholders. Either way, reference images
+# and LoRAs of characters[]/world[] STILL attach - the prompt controls
+# text, never identity.
+prompt = '''
+{style}
+Macro insert, 35mm: {action}
+{world}
+'''
+prompt_extra = "shallow depth of field, oily metal sheen, fine film grain"
+negative_extra = "blurry digits, text artifacts"    # optional; appended to
+                           # the composed negative prompt

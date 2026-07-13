@@ -1,0 +1,52 @@
+# characters/mara-chen.toml - the filename stem IS the character's id
+# ("mara-chen"), used in scene casts, shot characters[], and dialogue cues.
+# Rename via `autoteur mv character` (rewrites references project-wide).
+# New top-level fields go directly below schema_version - NEVER at the end
+# of the file (they would land inside the last table).
+schema_version = 1
+
+name = "Mara Chen"
+aliases = ["The Locksmith"]    # optional display names; not valid as references
+
+description = '''
+Late 30s safecracker; ex-structural engineer. Talks like she is rationing
+words. Loyal until the math says otherwise - and she always does the math.
+'''
+
+# Voice profile - used by the dialogue/audio pipeline, never the image prompt.
+[voice]
+provider = "elevenlabs"        # optional; falls back to the project default
+voice_id = "pNInz6obpgDQGcFmaJgB"
+style = "low, dry, measured; slight rasp; never raises her voice"
+reference_audio = "characters/refs/mara-chen/voice-sample.wav"   # optional
+
+# Prompt fragments - injected wherever {characters} resolves in a shot that
+# casts her. Visual description only, comma-phrase style.
+[prompt]
+fragment = "Mara Chen, East Asian woman in her late 30s, sharp jaw, short black hair with a gray streak, faded burn scar on left forearm, dark utility jacket"
+negative = "youthful glamour makeup, long hair, jewelry"     # optional
+
+# Named variants (optional). A shot pins one by writing "mara-chen:storm-gear"
+# in its characters[]; the variant REPLACES `fragment` for that shot.
+# Reference images and adapters still apply.
+[prompt.variants]
+storm-gear = "Mara Chen, late 30s, rain-plastered black hair under a dripping hood, black storm poncho over a dark utility jacket"
+
+# Visual identity - reference images and adapters attach automatically as
+# generation INPUTS to every shot that casts her; they never appear in the
+# prompt text. This section stays LAST in the file: the table arrays below
+# would swallow any key appended after them.
+[visual]
+reference_images = [
+  "characters/refs/mara-chen/front.png",           # first image = primary
+  "characters/refs/mara-chen/profile-left.png",    # repo-relative, forward slashes
+]
+
+# Optional LoRA / embedding stack, applied in listed order.
+[[visual.adapters]]
+kind = "lora"                  # "lora" | "embedding"
+source = "civitai:123456"      # provider ref, URL, or repo-relative path
+                               # (large weight files stay OUT of git - use
+                               # provider refs, or gitignored assets/)
+weight = 0.85
+trigger = "m4rachen woman"     # trigger token, auto-prepended to her fragment

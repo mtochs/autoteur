@@ -1,0 +1,35 @@
+# scenes/012-vault-breach/scene.toml
+# The directory name is <NNN>-<slug>. NNN is sort order ONLY - renumber
+# freely (gap-number in steps of 10; the app sorts numerically). The slug
+# IS the scene's identity: takes.manifest.toml and timeline.toml reference
+# shots as "<scene-slug>/<shot-id>". Renaming the slug is an identity
+# change - use `autoteur mv scene` so references are rewritten with it.
+schema_version = 1
+
+title = "Breaching the Halcyon vault"
+
+# Beats this scene realizes (ids from story/beats.toml). May be empty -
+# unmapped scenes show in a Beat Board side tray. Beats never list scenes;
+# the reverse map is derived live.
+beats = ["cold-open-heist"]
+
+# Scene cast and world (slugs = filenames under characters/ and world/).
+# Shots inherit these unless they override (see shots.toml).
+characters = ["mara-chen", "june-park"]
+location = "halcyon-vault"          # world entry with kind = "location"
+world = ["crew-drill-rig"]          # props / vehicles / extra style bibles
+
+int_ext = "INT"                     # optional: "INT" | "EXT" | "INT/EXT"
+time = "NIGHT"                      # optional free text
+mood = "airless, blue-lit, held breath before the alarm"
+
+synopsis = '''
+Night. Mara and June work the vault door in near silence. The drill
+bites; the alarm trips forty seconds early. June freezes a half-second
+too long, and Mara sees it.
+'''
+
+director_notes = '''
+Whisper volume until the alarm - it should feel physically loud by
+contrast. Hold on June when it trips; the audience suspects her first.
+'''
