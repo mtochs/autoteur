@@ -1,0 +1,10 @@
+# Generated media (content-addressed cache; the committed manifest can
+# re-print any take from the negative)
+/takes/
+
+# Per-user view state (zoom, board layout, color-by toggles)
+/.autoteur/
+
+# Large model weights - reference them by provider ref or hash instead
+/assets/adapters/
+/models/

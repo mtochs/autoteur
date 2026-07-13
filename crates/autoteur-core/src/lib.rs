@@ -9,8 +9,10 @@
 
 pub mod doc;
 pub mod error;
+pub mod git;
 pub mod id;
 pub mod lint;
+pub mod project;
 pub mod prompt;
 pub mod schema;
 

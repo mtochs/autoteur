@@ -1,0 +1,13 @@
+# timeline.toml - the Editing Room assembly.
+# Entries reference shots as "<scene-slug>/<shot-id>" and play each shot's
+# circled take (selected_take) - one source of truth with Dailies. Trim
+# points clamp to the current take's length at render time.
+#
+# Feature form (ordered entries):
+#   [[entries]]
+#   shot = "vault-breach/a"
+#   in_s = 0.4                 # optional trim in
+#   out_s = 3.2                # optional trim out
+#
+# Series form: one [[sequences]] per episode, each with its own entries.
+schema_version = 1

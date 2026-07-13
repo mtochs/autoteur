@@ -1,0 +1,22 @@
+# world/{{SLUG}}.toml - the filename stem IS this entry's id ("{{SLUG}}").
+# Rename via `autoteur mv world` (rewrites references project-wide).
+# New top-level fields go directly below schema_version - NEVER at the end
+# of the file.
+schema_version = 1
+
+name = "{{NAME}}"
+kind = "{{KIND}}"              # location | prop | vehicle | style
+
+description = '''
+'''
+
+# Fragment injected into {location}, {world}, or {style} (kind = "style")
+# for every shot where this entry is in play.
+[prompt]
+fragment = ""
+# negative = ""
+
+# Reference images / adapters attach automatically as generation INPUTS.
+# This section stays LAST in the file.
+[visual]
+reference_images = []

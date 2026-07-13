@@ -1,0 +1,6 @@
+# takes.manifest.toml - machine-written record of every generation.
+# Append-only; entries are immutable history. Written by the Autoteur
+# generation pipeline - do not edit existing entries by hand.
+# Media lives content-addressed under takes/ (gitignored); each take id is
+# "tk_" + the first 12 hex chars of the BLAKE3 of its primary output.
+schema_version = 1

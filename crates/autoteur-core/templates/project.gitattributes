@@ -1,0 +1,9 @@
+# Autoteur project files make byte-level round-trip guarantees; keep them
+# LF in working copies on every platform.
+* text=auto
+*.toml text eol=lf
+*.md text eol=lf
+
+# The takes manifest is append-only with content-addressed ids: parallel
+# branches appending takes merge cleanly as a union.
+takes.manifest.toml merge=union

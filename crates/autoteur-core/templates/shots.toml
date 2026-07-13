@@ -1,0 +1,20 @@
+# scenes/{{DIR}}/shots.toml
+# Shot order = block order; reorder by moving whole [[shots]] blocks.
+# Shot ids are per-scene letters ("a", "b", ... then "aa"), FROZEN at
+# creation and never reused - when adding a shot, take the next letter
+# after the highest ever used (check takes.manifest.toml too). Delete
+# nothing that has takes; set status = "omitted" instead.
+# Global reference form: "{{SLUG}}/a" (scene slug + shot id).
+# Keep every key of a shot inside its own [[shots]] block, and keep each
+# dialogue cue on a single line:
+#   dialogue = [
+#     { character = "some-slug", line = "...", delivery = "optional" },
+#   ]
+# Other per-shot keys: framing (wide|medium|close-up|extreme-close-up|
+# two-shot|ots|pov|insert|aerial or free text), camera (move), action,
+# characters (omit = inherit scene cast, [] = nobody), world (omit =
+# inherit scene location+world, explicit = replaces both), duration_s,
+# status (planned|ready|locked|omitted), selected_take (omit when nothing
+# is circled), prompt (custom template - placeholders keep identity
+# injection alive), prompt_extra, negative_extra, notes.
+schema_version = 1

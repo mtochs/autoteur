@@ -1,0 +1,15 @@
+# autoteur.toml - project manifest. See AGENTS.md for the full contract.
+schema_version = 1
+
+title = "{{TITLE}}"
+format = "{{FORMAT}}"      # "feature" | "series" (UI hint, not a schema switch)
+
+[defaults]
+# Template used when a shot has no `prompt` of its own. Placeholders:
+# {style} {framing} {camera} {action} {characters} {location} {world}
+# {mood} {dialogue} {extra} - empty slots collapse cleanly.
+prompt_template = "{style}\n{framing}. {action}\n{camera}\n{characters}\n{location}\n{world}\n{mood}\n{extra}"
+# Base negative prompt, composed with character/world negatives.
+negative = "watermark, text overlay, low quality"
+# World slugs (kind = "style") whose fragments fill {style} in every prompt.
+style = []

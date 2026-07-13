@@ -1,0 +1,16 @@
+# story/beats.toml - one [[beats]] block per index card on the Beat Board.
+# Card order = block order in this file. Reorder by moving whole blocks.
+# Series: the board groups cards by episode; append a new beat after the
+# last beat of the SAME episode. Root keys (schema_version) must appear
+# above the first [[...]] block - never at the end of the file.
+#
+# A feature film omits [[episodes]] entirely. To make this a series, add:
+#   [[episodes]]
+#   id = "e01"               # frozen at creation
+#   title = "Episode title"
+#   color = "sky"            # rose|amber|lime|teal|sky|violet|slate|sand
+# ...and stamp `episode = "e01"` onto each beat.
+#
+# Per beat: id (kebab-case, FROZEN - scenes reference it), title, summary,
+# and optionally episode, act (integer), color (manual tint), notes.
+schema_version = 1

@@ -1,0 +1,28 @@
+# scenes/{{DIR}}/scene.toml
+# The directory name is <NNN>-<slug>. NNN is sort order ONLY - renumber
+# freely (gap-number in steps of 10; the app sorts numerically). The slug
+# IS the scene's identity: takes.manifest.toml and timeline.toml reference
+# shots as "<scene-slug>/<shot-id>". Renaming the slug is an identity
+# change - use `autoteur mv scene` so references are rewritten with it.
+schema_version = 1
+
+title = "{{TITLE}}"
+
+# Beats this scene realizes (ids from story/beats.toml). May be empty.
+beats = []
+
+# Scene cast and world (slugs = filenames under characters/ and world/).
+# Shots inherit these unless they override (see shots.toml).
+characters = []
+world = []
+# location = "some-world-slug"   # world entry with kind = "location"
+
+# int_ext = "INT"                # optional: "INT" | "EXT" | "INT/EXT"
+# time = "NIGHT"                 # optional free text
+# mood = ""                      # one line; feeds the {mood} prompt slot
+
+synopsis = '''
+'''
+
+director_notes = '''
+'''

@@ -1,0 +1,42 @@
+# characters/{{SLUG}}.toml - the filename stem IS the character's id
+# ("{{SLUG}}"), used in scene casts, shot characters[], and dialogue cues.
+# Rename via `autoteur mv character` (rewrites references project-wide).
+# New top-level fields go directly below schema_version - NEVER at the end
+# of the file (they would land inside the last table).
+schema_version = 1
+
+name = "{{NAME}}"
+# aliases = []                 # optional display names; not references
+
+description = '''
+'''
+
+# Voice profile - used by the dialogue/audio pipeline, never the image prompt.
+# [voice]
+# provider = "elevenlabs"      # optional; falls back to the project default
+# voice_id = ""
+# style = ""
+
+# Prompt fragments - injected wherever {characters} resolves in a shot that
+# casts this character. Visual description only, comma-phrase style.
+[prompt]
+fragment = ""
+# negative = ""                # optional; joins the negative prompt
+
+# Named variants (optional). A shot pins one with "{{SLUG}}:variant-name"
+# in its characters[]; the variant REPLACES `fragment` for that shot.
+# [prompt.variants]
+# variant-name = ""
+
+# Visual identity - reference images and adapters attach automatically as
+# generation INPUTS to every shot that casts this character. This section
+# stays LAST in the file: table arrays below would swallow appended keys.
+[visual]
+reference_images = []
+
+# Optional LoRA / embedding stack, applied in listed order:
+# [[visual.adapters]]
+# kind = "lora"                # "lora" | "embedding"
+# source = ""                  # provider ref, URL, or repo-relative path
+# weight = 0.85
+# trigger = ""                 # token(s) auto-prepended to the fragment

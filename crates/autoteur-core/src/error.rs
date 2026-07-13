@@ -25,6 +25,25 @@ pub enum Error {
 
     #[error("edit failed: {0}")]
     Edit(String),
+
+    #[error("{path} is not UTF-8 text{hint}")]
+    Encoding {
+        path: PathBuf,
+        /// e.g. " (it looks like UTF-16 — rewrite it as UTF-8)"
+        hint: String,
+    },
+
+    #[error("git operation failed")]
+    Git(#[source] Box<git2::Error>),
+
+    #[error("{0}")]
+    Project(String),
+}
+
+impl From<git2::Error> for Error {
+    fn from(e: git2::Error) -> Self {
+        Error::Git(Box::new(e))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
