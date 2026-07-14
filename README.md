@@ -10,7 +10,15 @@ An Autoteur project is a plain git repository. Story lives in human-readable TOM
 
 Early development, moving fast. Working today: the complete headless loop (`autoteur` CLI: create → beats → scenes → shots → prompt resolution with character/world injection → Replicate generation → circled takes → FFmpeg export) and the Tauri desktop app with all nine rooms — Writers' Room, Beat Board, Casting, Locations & Props, Shot List, Dailies, Editing Room, Screening Room, Studio Settings — wired to the live-sync engine: file changes appear on screen within a second, and every GUI gesture is a surgical file edit. Format spec: [docs/proposals/0001-file-formats-and-live-sync.md](docs/proposals/0001-file-formats-and-live-sync.md).
 
-Run the app from `apps/desktop` with `npm install && npm run tauri dev`.
+**Standalone app:** build a double-clickable `Autoteur.exe` into the repo root with:
+
+```
+cd apps/desktop && npm install && npm run build
+cargo build --release -p autoteur-desktop
+cp target/release/autoteur-desktop.exe ./Autoteur.exe
+```
+
+The exe embeds the entire UI — no server, no install (Windows 11 ships the WebView2 runtime it uses). For development with hot reload, run `npm run tauri dev` from `apps/desktop` instead.
 
 ## Layout
 
