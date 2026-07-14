@@ -13,10 +13,13 @@ Early development, moving fast. Working today: the complete headless loop (`auto
 **Standalone app:** build a double-clickable `Autoteur.exe` into the repo root with:
 
 ```
-cd apps/desktop && npm install && npm run build
-cargo build --release -p autoteur-desktop
-cp target/release/autoteur-desktop.exe ./Autoteur.exe
+cd apps/desktop && npm install
+npx tauri build --no-bundle
+cp ../../target/release/autoteur-desktop.exe ../../Autoteur.exe
 ```
+
+(The Tauri CLI step matters: a plain `cargo build --release` produces a
+dev-mode binary that expects the Vite dev server instead of embedding the UI.)
 
 The exe embeds the entire UI — no server, no install (Windows 11 ships the WebView2 runtime it uses). For development with hot reload, run `npm run tauri dev` from `apps/desktop` instead.
 
