@@ -8,9 +8,9 @@ An Autoteur project is a plain git repository. Story lives in human-readable TOM
 
 ## Status
 
-Early development. Current stage: core domain types and file formats (see [docs/proposals/0001-file-formats-and-live-sync.md](docs/proposals/0001-file-formats-and-live-sync.md) for the format specification).
+Early development, moving fast. Working today: the complete headless loop (`autoteur` CLI: create → beats → scenes → shots → prompt resolution with character/world injection → Replicate generation → circled takes → FFmpeg export) and the Tauri desktop app with all nine rooms — Writers' Room, Beat Board, Casting, Locations & Props, Shot List, Dailies, Editing Room, Screening Room, Studio Settings — wired to the live-sync engine: file changes appear on screen within a second, and every GUI gesture is a surgical file edit. Format spec: [docs/proposals/0001-file-formats-and-live-sync.md](docs/proposals/0001-file-formats-and-live-sync.md).
 
-Planned v0.1: Writers' Room, Beat Board, Casting & World, Shot List, Dailies, Editing Room, Screening Room export, live sync with an Activity feed, Replicate as the primary generation provider.
+Run the app from `apps/desktop` with `npm install && npm run tauri dev`.
 
 ## Layout
 
