@@ -17,6 +17,7 @@ pub mod project;
 pub mod prompt;
 pub mod provider;
 pub mod queue;
+pub mod render;
 pub mod schema;
 pub mod sync;
 pub mod takes_store;

@@ -129,6 +129,7 @@ impl Fixture {
                 prompt_template: None,
                 negative: Some("watermark".to_owned()),
                 style: vec![slug("neon-noir-style")],
+                ..Defaults::default()
             },
             scene: SceneFile {
                 schema_version: 1,

@@ -58,4 +58,13 @@ pub struct Defaults {
     /// World slugs whose fragments fill `{style}` in every prompt.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub style: Vec<Slug>,
+    /// Default provider id for generation, e.g. "replicate".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Default model for video shots (`owner/name` or `owner/name:version`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_model: Option<String>,
+    /// Default model for still/image shots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_model: Option<String>,
 }

@@ -108,10 +108,31 @@ pub fn append_take(root: &Path, record: &TakeRecord) -> Result<bool> {
         .and_then(Item::as_array_of_tables_mut)
         .ok_or_else(|| Error::Edit("takes.manifest.toml has a non-array `takes` key".to_owned()))?;
     let mut table = table;
-    table.set_position(next_position);
+    // Positions are document-global and nested blocks ([takes.inputs],
+    // [[takes.outputs]]) carry small ones from the standalone render;
+    // left alone they'd serialize under an EARLIER take. Renumber the
+    // whole subtree after everything already in the manifest.
+    let mut next = next_position;
+    renumber_positions(&mut table, &mut next);
     aot.push(table);
 
     let crlf = doc::detect_crlf(&text);
     atomic::write_atomic(&path, doc::serialize(&document, crlf).as_bytes())?;
     Ok(true)
+}
+
+fn renumber_positions(table: &mut toml_edit::Table, next: &mut isize) {
+    table.set_position(*next);
+    *next += 1;
+    for (_, item) in table.iter_mut() {
+        match item {
+            Item::Table(child) => renumber_positions(child, next),
+            Item::ArrayOfTables(children) => {
+                for child in children.iter_mut() {
+                    renumber_positions(child, next);
+                }
+            }
+            _ => {}
+        }
+    }
 }
