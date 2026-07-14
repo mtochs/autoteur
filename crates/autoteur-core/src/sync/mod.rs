@@ -155,8 +155,19 @@ impl SyncEngine {
                     if event.need_rescan() {
                         let _ = error_tx.send(RawMsg::Sweep);
                     }
-                    for path in event.paths {
-                        let _ = error_tx.send(RawMsg::Touch(path));
+                    // inotify reports READS as Access events — including the
+                    // engine's own parses, which would feed the watcher its
+                    // own echo forever. Only close-after-write matters.
+                    use notify::event::{AccessKind, AccessMode, EventKind};
+                    let relevant = match event.kind {
+                        EventKind::Access(AccessKind::Close(AccessMode::Write)) => true,
+                        EventKind::Access(_) => false,
+                        _ => true,
+                    };
+                    if relevant {
+                        for path in event.paths {
+                            let _ = error_tx.send(RawMsg::Touch(path));
+                        }
                     }
                 }
                 Err(_) => {
@@ -547,7 +558,12 @@ fn process_path(
         Outcome::Deltas(deltas, apply) => {
             let has_removals = deltas.iter().any(Delta::is_removal);
             if has_removals && !allow_removals {
-                holds.insert(rel.to_owned(), Instant::now() + inner.options.removal_hold);
+                // Keep the ORIGINAL deadline: under an event storm, replacing
+                // it would push the quarantine forward forever and the
+                // removal would never be believed.
+                holds
+                    .entry(rel.to_owned())
+                    .or_insert_with(|| Instant::now() + inner.options.removal_hold);
                 return;
             }
             apply(inner);
@@ -1048,10 +1064,9 @@ fn rescan_scenes(inner: &Arc<Inner>, allow_removals: bool, holds: &mut HashMap<P
         return;
     }
     if deltas.iter().any(Delta::is_removal) && !allow_removals {
-        holds.insert(
-            PathBuf::from("::scenes::"),
-            Instant::now() + inner.options.removal_hold,
-        );
+        holds
+            .entry(PathBuf::from("::scenes::"))
+            .or_insert_with(|| Instant::now() + inner.options.removal_hold);
         return;
     }
     lock(&inner.state).scenes = fresh;
