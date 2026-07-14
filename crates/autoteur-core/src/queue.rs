@@ -27,7 +27,8 @@ pub struct GenerationJob {
     pub seed: Option<i64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "stage", rename_all = "snake_case")]
 pub enum JobStage {
     Queued,
     Running,
@@ -35,7 +36,7 @@ pub enum JobStage {
     Failed { message: String },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct JobUpdate {
     pub job: u64,
     pub shot: ShotRef,

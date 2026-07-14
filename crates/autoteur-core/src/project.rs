@@ -40,14 +40,14 @@ pub struct Project {
     root: PathBuf,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct FileEntry<T> {
     pub path: PathBuf,
     pub data: T,
     pub lints: Vec<Lint>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SceneEntry {
     pub number: u32,
     pub slug: Slug,
@@ -56,7 +56,7 @@ pub struct SceneEntry {
     pub shots: Option<FileEntry<ShotsFile>>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct ProjectState {
     pub manifest: Option<FileEntry<ProjectFile>>,
     pub beats: Option<FileEntry<BeatsFile>>,
@@ -70,7 +70,7 @@ pub struct ProjectState {
 
 /// A file that could not be read or parsed at all (the state simply omits
 /// it; the watcher layer keeps last-good data for display).
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct FileIssue {
     pub path: PathBuf,
     pub message: String,
@@ -83,7 +83,7 @@ pub struct ProjectScan {
 }
 
 /// A cross-file finding, anchored to the file that should change.
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ProjectLint {
     pub path: PathBuf,
     pub severity: Severity,
@@ -616,6 +616,27 @@ pub fn validate(state: &ProjectState) -> Vec<ProjectLint> {
     }
 
     lints
+}
+
+/// The next unused shot letter for a scene: one past the highest id ever
+/// seen in shots.toml OR the takes manifest, so deleted shots' letters are
+/// never reused (their takes still reference them).
+pub fn next_shot_id(state: &ProjectState, scene: &Slug) -> crate::id::ShotId {
+    let live = state
+        .scenes
+        .iter()
+        .filter(|s| &s.slug == scene)
+        .flat_map(|s| s.shots.iter())
+        .flat_map(|f| f.data.shots.iter())
+        .map(|shot| shot.id.clone());
+    let historical = state
+        .takes
+        .iter()
+        .flat_map(|m| m.data.takes.iter())
+        .filter(|t| &t.shot.scene == scene)
+        .map(|t| t.shot.shot.clone());
+    let all: Vec<crate::id::ShotId> = live.chain(historical).collect();
+    crate::id::ShotId::next_after(all.iter())
 }
 
 /// Read project text: UTF-8 required, UTF-8 BOM tolerated, UTF-16 detected

@@ -15,8 +15,8 @@ Planned v0.1: Writers' Room, Beat Board, Casting & World, Shot List, Dailies, Ed
 ## Layout
 
 - `crates/autoteur-core` — domain types, TOML parsing/surgical editing, prompt resolution, validation
-- `crates/autoteur-cli` — `autoteur` command-line tool (planned)
-- `apps/desktop` — Tauri 2 desktop app (planned)
+- `crates/autoteur-cli` — the `autoteur` command-line tool
+- `apps/desktop` — Tauri 2 desktop app (React + TypeScript + Tailwind)
 
 ## License
 

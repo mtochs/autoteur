@@ -23,7 +23,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Test
-        run: cargo test --workspace
+      - name: Clippy (core + cli)
+        run: cargo clippy -p autoteur-core -p autoteur-cli --all-targets -- -D warnings
+      - name: Test (core + cli)
+        run: cargo test -p autoteur-core -p autoteur-cli
+      - uses: actions/setup-node@v4
+        if: matrix.os == 'windows-latest'
+        with:
+          node-version: 22
+      - name: Desktop frontend
+        if: matrix.os == 'windows-latest'
+        working-directory: apps/desktop
+        run: npm ci && npm run build
+      - name: Desktop backend
+        if: matrix.os == 'windows-latest'
+        run: cargo clippy -p autoteur-desktop -- -D warnings

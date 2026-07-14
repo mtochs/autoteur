@@ -1,0 +1,26 @@
+[package]
+name = "autoteur-desktop"
+description = "Autoteur desktop app — the director's chair"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[lib]
+name = "autoteur_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+autoteur-core = { path = "../../../crates/autoteur-core" }
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml_edit = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "warn"

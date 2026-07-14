@@ -8,7 +8,7 @@ use git2::{IndexAddOption, Repository, Signature};
 
 use crate::error::Result;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SavePoint {
     pub id: String,
     pub summary: String,

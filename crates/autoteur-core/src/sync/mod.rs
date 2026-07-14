@@ -45,14 +45,15 @@ pub use classify::FileKind;
 pub use delta::{Delta, StoryDoc};
 pub use journal::WriteJournal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Origin {
     Startup,
     Local,
     External,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SyncEvent {
     pub rev: u64,
     pub origin: Origin,
@@ -178,6 +179,10 @@ impl SyncEngine {
         Ok((SyncEngine { inner }, rx))
     }
 
+    pub fn root(&self) -> &Path {
+        &self.inner.root
+    }
+
     /// A clone of the canonical state (last good data for every file).
     pub fn snapshot(&self) -> ProjectState {
         lock(&self.inner.state).clone()
@@ -252,7 +257,7 @@ impl SyncEngine {
         })
     }
 
-    fn shots_rel_path(&self, scene: &Slug) -> Result<PathBuf> {
+    pub fn shots_rel_path(&self, scene: &Slug) -> Result<PathBuf> {
         let state = lock(&self.inner.state);
         let entry = state
             .scenes
@@ -264,6 +269,31 @@ impl SyncEngine {
             .strip_prefix(&self.inner.root)
             .map_err(|_| Error::Project(format!("scene `{scene}` is outside the project")))?;
         Ok(rel.join("shots.toml"))
+    }
+
+    /// Surgical read-modify-write on any project TOML file: read fresh,
+    /// apply the edit, verify the file is unchanged, write atomically, and
+    /// journal the echo so the watcher tags it local. This is THE write
+    /// path for every GUI gesture.
+    pub fn edit_document(
+        &self,
+        rel: &Path,
+        op: impl Fn(&mut DocumentMut) -> Result<()>,
+    ) -> Result<()> {
+        self.edit_toml(rel, op)
+    }
+
+    /// Replace a text file (markdown docs) atomically, journaled as local.
+    pub fn write_text_file(&self, rel: &Path, content: &str) -> Result<()> {
+        let abs = self.inner.root.join(rel);
+        if let Some(parent) = abs.parent() {
+            fs::create_dir_all(parent).map_err(|e| Error::Io {
+                path: parent.to_owned(),
+                source: e,
+            })?;
+        }
+        lock(&self.inner.journal).record(&abs, content.as_bytes());
+        atomic::write_atomic(&abs, content.as_bytes())
     }
 
     fn edit_toml(&self, rel: &Path, op: impl Fn(&mut DocumentMut) -> Result<()>) -> Result<()> {

@@ -15,7 +15,8 @@ use crate::schema::scene::SceneFile;
 use crate::schema::shots::{ShotStatus, ShotsFile};
 use crate::schema::world::WorldFile;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
     /// The file is unsafe to act on; treat like a parse failure.
     Error,
@@ -23,7 +24,7 @@ pub enum Severity {
     Warning,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Lint {
     pub severity: Severity,
     pub message: String,

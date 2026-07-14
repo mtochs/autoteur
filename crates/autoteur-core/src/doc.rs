@@ -162,6 +162,73 @@ pub fn remove_root_field(doc: &mut DocumentMut, field: &str) -> bool {
     remove_table_field(doc.as_table_mut(), field).0
 }
 
+/// Append a block to a `[[key]]` array (creating it if absent), giving
+/// the new subtree fresh document positions so nested tables never
+/// serialize under an earlier block.
+pub fn append_block(document: &mut DocumentMut, key: &str, mut table: Table) -> Result<()> {
+    let mut next = max_table_position(document) + 1;
+    renumber_positions(&mut table, &mut next);
+    if document.get(key).is_none() {
+        document.insert(key, Item::ArrayOfTables(toml_edit::ArrayOfTables::new()));
+    }
+    document
+        .get_mut(key)
+        .and_then(Item::as_array_of_tables_mut)
+        .ok_or_else(|| Error::Edit(format!("`{key}` exists but is not an array of tables")))?
+        .push(table);
+    Ok(())
+}
+
+/// Remove the block at `index` from a `[[key]]` array.
+pub fn remove_block(document: &mut DocumentMut, key: &str, index: usize) -> Result<()> {
+    let aot = document
+        .get_mut(key)
+        .and_then(Item::as_array_of_tables_mut)
+        .ok_or_else(|| Error::Edit(format!("no [[{key}]] array in document")))?;
+    if index >= aot.len() {
+        return Err(Error::Edit(format!("no [[{key}]] block at index {index}")));
+    }
+    aot.remove(index);
+    Ok(())
+}
+
+/// Set a field inside a `[name]` subtable, creating the table if absent.
+pub fn set_subtable_field(document: &mut DocumentMut, name: &str, field: &str, value: Value) {
+    if document.get(name).and_then(Item::as_table_like).is_none() {
+        let mut table = Table::new();
+        table.set_position(max_table_position(document) + 1);
+        document.insert(name, Item::Table(table));
+    }
+    if let Some(table) = document.get_mut(name).and_then(Item::as_table_mut) {
+        set_table_field(table, field, value);
+    }
+}
+
+/// Remove a field from a `[name]` subtable. Returns true when it existed.
+pub fn remove_subtable_field(document: &mut DocumentMut, name: &str, field: &str) -> bool {
+    document
+        .get_mut(name)
+        .and_then(Item::as_table_mut)
+        .map(|table| remove_table_field(table, field).0)
+        .unwrap_or(false)
+}
+
+pub(crate) fn renumber_positions(table: &mut Table, next: &mut isize) {
+    table.set_position(*next);
+    *next += 1;
+    for (_, item) in table.iter_mut() {
+        match item {
+            Item::Table(child) => renumber_positions(child, next),
+            Item::ArrayOfTables(children) => {
+                for child in children.iter_mut() {
+                    renumber_positions(child, next);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn block_mut<'a>(doc: &'a mut DocumentMut, key: &str, index: usize) -> Result<&'a mut Table> {
     doc.get_mut(key)
         .and_then(Item::as_array_of_tables_mut)

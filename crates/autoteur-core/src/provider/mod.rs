@@ -23,10 +23,20 @@ pub struct GenerationRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OutputKind {
+    // (serialized via as_str below)
     Image,
     Video,
     Audio,
     Other(String),
+}
+
+impl serde::Serialize for OutputKind {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
 }
 
 impl OutputKind {
@@ -67,7 +77,7 @@ pub struct GenerationResult {
 
 /// A model a provider recommends for a task, fetched dynamically — this
 /// space shifts monthly, so nothing is hardcoded.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ModelInfo {
     /// `owner/name`, ready to use in a GenerationRequest.
     pub slug: String,

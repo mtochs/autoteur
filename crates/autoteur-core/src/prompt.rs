@@ -44,7 +44,7 @@ pub struct PromptContext<'a> {
     pub world: &'a BTreeMap<Slug, WorldFile>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct ResolvedPrompt {
     pub prompt: String,
     pub negative: Option<String>,
@@ -54,13 +54,13 @@ pub struct ResolvedPrompt {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct OwnedRef {
     pub owner: Slug,
     pub path: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct OwnedAdapter {
     pub owner: Slug,
     pub adapter: Adapter,

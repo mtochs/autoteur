@@ -11,13 +11,15 @@ use crate::schema::beats::{Beat, BeatsFile, Episode};
 use crate::schema::shots::{Shot, ShotsFile};
 use crate::schema::takes::{TakeRecord, TakesManifest};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum StoryDoc {
     Logline,
     Treatment,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(tag = "type")]
 pub enum Delta {
     // Beat Board
     BeatAdded {
